@@ -51,11 +51,61 @@ export default function AuthPanel() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-paper px-4 text-ink">
+    <div
+      className="flex min-h-screen items-center justify-center px-4 text-ink"
+      // Subtle amber-over-paper wash (both existing tokens) — reads as soft
+      // texture/light, not a new brand color.
+      style={{
+        background:
+          'radial-gradient(120% 80% at 50% -10%, rgba(226, 166, 59, 0.10) 0%, rgba(246, 245, 241, 1) 55%)',
+      }}
+    >
       <div className="w-full max-w-sm">
-        <div className="mb-6 text-center font-display text-2xl font-bold leading-tight">
-          Dealership<span className="text-amber">.</span>
-          <div className="text-sm font-normal text-ink/60">Inventory System</div>
+        <div className="mb-6 text-center">
+          {/* Understated line-art car, matching StockGauge's stroke style, with a
+              single amber accent (the headlight). */}
+          <svg
+            viewBox="0 0 120 64"
+            className="mx-auto mb-3 h-12 w-auto"
+            fill="none"
+            role="img"
+            aria-label="Line-art illustration of a car"
+          >
+            <path
+              d="M8 46 L8 40 C8 36 11 35 15 35 L34 34 L45 23 C47 21 50 20 53 20 L73 20 C77 20 80 22 82 25 L91 34 L106 36 C111 37 112 40 112 43 L112 46"
+              stroke="#14183B"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M40 34 L84 34 M62 20 L62 34"
+              stroke="#14183B"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeOpacity="0.45"
+            />
+            <path
+              d="M8 46 L28 46 M52 46 L76 46 M100 46 L112 46"
+              stroke="#14183B"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            />
+            <circle cx="40" cy="46" r="9" stroke="#14183B" strokeWidth="2.5" />
+            <circle cx="88" cy="46" r="9" stroke="#14183B" strokeWidth="2.5" />
+            {/* Amber accent: the headlight. */}
+            <circle cx="109" cy="40" r="2.5" fill="#E2A63B" />
+          </svg>
+
+          <div className="font-display text-2xl font-bold leading-tight">
+            Dealership<span className="text-amber">.</span>
+            <div className="text-sm font-normal text-ink/60">Inventory System</div>
+          </div>
+
+          <p className="mx-auto mt-2 max-w-xs text-sm text-ink/60">
+            Manage inventory, monitor stock, and streamline vehicle sales.
+          </p>
         </div>
 
         <div className="rounded-2xl border border-ink/10 bg-white p-6 shadow-sm">

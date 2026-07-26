@@ -82,7 +82,7 @@ export default function VehicleCard({
   };
 
   return (
-    <article className="flex flex-col gap-4 rounded-2xl border border-ink/10 bg-white p-5 shadow-sm">
+    <article className="flex flex-col gap-4 rounded-2xl border border-ink/10 bg-white p-6 shadow-sm transition duration-200 hover:border-ink/20 hover:shadow-lg motion-safe:hover:-translate-y-1">
       <header className="flex items-start justify-between gap-3">
         <div>
           <h3 className="font-display text-xl font-semibold leading-tight text-ink">
