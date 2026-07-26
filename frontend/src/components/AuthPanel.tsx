@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Button from './Button';
 
@@ -13,11 +13,14 @@ export default function AuthPanel() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
   const switchMode = (next: Mode) => {
     setMode(next);
     setError(null);
+    setSuccess(null);
     // Clear the register-only field so a stale mismatch error can't linger when
     // switching modes.
     setConfirmPassword('');
@@ -26,6 +29,7 @@ export default function AuthPanel() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccess(null);
 
     if (mode === 'register' && password !== confirmPassword) {
       // Frontend-only check: bail before touching the API so no request fires.
@@ -40,6 +44,13 @@ export default function AuthPanel() {
       } else {
         // Confirm Password is validation-only; the API takes { email, password }.
         await register(email, password);
+        // Registration does NOT log the user in. Move them to the login view
+        // with their email pre-filled so they just enter their password.
+        setMode('login');
+        setPassword('');
+        setConfirmPassword('');
+        setSuccess('Account created — log in to continue.');
+        requestAnimationFrame(() => passwordRef.current?.focus());
       }
     } catch (err) {
       // The API layer already surfaces the backend's `message` (400/401/409),
@@ -153,6 +164,7 @@ export default function AuthPanel() {
               </label>
               <input
                 id="password"
+                ref={passwordRef}
                 type="password"
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 required
@@ -179,6 +191,15 @@ export default function AuthPanel() {
                   placeholder="••••••••"
                 />
               </div>
+            )}
+
+            {success && (
+              <p
+                role="status"
+                className="rounded-lg border border-ink/10 bg-ink/5 px-3 py-2 text-sm font-medium text-ink"
+              >
+                {success}
+              </p>
             )}
 
             {error && (

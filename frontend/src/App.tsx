@@ -453,6 +453,13 @@ function Dashboard() {
 }
 
 export default function App() {
-  const { token } = useAuth();
-  return token ? <Dashboard /> : <AuthPanel />;
+  const { user, token } = useAuth();
+  // Single, unconditional session gate: a valid session requires BOTH a user and
+  // a token, in which case only the Dashboard renders; every other state renders
+  // AuthPanel. There is no other branch anywhere that mounts AuthPanel, so an
+  // authenticated user can never see the login/register screen — and because the
+  // token lives in React state only (no router, no storage), logout instantly
+  // flips this back to AuthPanel with no residual Dashboard state.
+  const isAuthenticated = Boolean(user && token);
+  return isAuthenticated ? <Dashboard /> : <AuthPanel />;
 }

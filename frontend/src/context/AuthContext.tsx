@@ -25,9 +25,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const register = useCallback(async (email: string, password: string) => {
-    const res = await api.register(email, password);
-    setUser(res.user);
-    setToken(res.token);
+    // Registration must NOT log the user in: we call the endpoint (which still
+    // returns a token) but deliberately ignore it, leaving user/token unset so
+    // the user logs in explicitly afterwards.
+    await api.register(email, password);
   }, []);
 
   const logout = useCallback(() => {
