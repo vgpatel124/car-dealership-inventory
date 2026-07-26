@@ -1,7 +1,19 @@
 // Vehicle service — business logic layer for the inventory catalog.
 //
-// These functions are intentionally unimplemented (TDD target). Each throws so
-// accidental use fails loudly. Implement them test-first.
+// listVehicles / createVehicle / searchVehicles are implemented below. The
+// remaining functions are still TDD targets and throw until implemented.
+
+import { Prisma, Vehicle } from '@prisma/client';
+import prisma from '../utils/prisma';
+
+// Domain error that carries an HTTP status so the controller can map it
+// directly instead of guessing from the message (mirrors AuthError).
+export class VehicleError extends Error {
+  constructor(public readonly statusCode: number, message: string) {
+    super(message);
+    this.name = 'VehicleError';
+  }
+}
 
 export interface VehicleInput {
   make: string;
@@ -24,8 +36,8 @@ export interface VehicleSearchFilters {
  *  - prisma.vehicle.findMany(), ideally ordered by createdAt desc.
  *  - Consider pagination later; for now return the full list.
  */
-export async function listVehicles(): Promise<unknown[]> {
-  throw new Error('not implemented yet');
+export async function listVehicles(): Promise<Vehicle[]> {
+  return prisma.vehicle.findMany({ orderBy: { createdAt: 'desc' } });
 }
 
 /**
@@ -35,8 +47,28 @@ export async function listVehicles(): Promise<unknown[]> {
  *  2. prisma.vehicle.create with quantity defaulting to 0 when omitted.
  *  3. Return the created vehicle.
  */
-export async function createVehicle(_input: VehicleInput): Promise<unknown> {
-  throw new Error('not implemented yet');
+export async function createVehicle(input: VehicleInput): Promise<Vehicle> {
+  const make = input?.make?.trim();
+  const model = input?.model?.trim();
+  const category = input?.category?.trim();
+  const { price } = input ?? {};
+  // The service owns input defaulting/validation (same as price below), so we
+  // set quantity here rather than relying on the schema's @default(0).
+  const quantity = input?.quantity ?? 0;
+
+  if (!make || !model || !category || price === undefined || price === null) {
+    throw new VehicleError(400, 'make, model, category and price are required');
+  }
+  if (typeof price !== 'number' || Number.isNaN(price) || price < 0) {
+    throw new VehicleError(400, 'price must be a non-negative number');
+  }
+  if (typeof quantity !== 'number' || Number.isNaN(quantity) || quantity < 0) {
+    throw new VehicleError(400, 'quantity must be a non-negative number');
+  }
+
+  return prisma.vehicle.create({
+    data: { make, model, category, price, quantity },
+  });
 }
 
 /**
@@ -46,8 +78,24 @@ export async function createVehicle(_input: VehicleInput): Promise<unknown> {
  *  - price range: gte minPrice and/or lte maxPrice when provided.
  *  - Relies on the make/model/category/price indexes in schema.prisma.
  */
-export async function searchVehicles(_filters: VehicleSearchFilters): Promise<unknown[]> {
-  throw new Error('not implemented yet');
+export async function searchVehicles(filters: VehicleSearchFilters): Promise<Vehicle[]> {
+  const where: Prisma.VehicleWhereInput = {};
+
+  // On SQLite, Prisma's `contains` compiles to a `LIKE` which is already
+  // case-insensitive for ASCII — so we deliberately omit `mode: 'insensitive'`
+  // (that option is unsupported by the SQLite connector and would throw).
+  if (filters.make) where.make = { contains: filters.make };
+  if (filters.model) where.model = { contains: filters.model };
+  if (filters.category) where.category = { contains: filters.category };
+
+  if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
+    const price: Prisma.FloatFilter = {};
+    if (filters.minPrice !== undefined) price.gte = filters.minPrice;
+    if (filters.maxPrice !== undefined) price.lte = filters.maxPrice;
+    where.price = price;
+  }
+
+  return prisma.vehicle.findMany({ where, orderBy: { createdAt: 'desc' } });
 }
 
 /**

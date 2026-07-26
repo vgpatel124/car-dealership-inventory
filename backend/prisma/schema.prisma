@@ -29,6 +29,9 @@ model Vehicle {
   model     String
   category  String
   price     Float
+  // Defensive fallback only: createVehicle() defaults quantity to 0 in
+  // TypeScript before the insert, so this DB default is a safety net rather
+  // than the primary mechanism (see src/services/vehicle.service.ts).
   quantity  Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
