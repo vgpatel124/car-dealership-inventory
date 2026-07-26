@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import { AuthError, registerUser, loginUser } from '../services/auth.service';
+import { registerUser, loginUser } from '../services/auth.service';
+import { sendError } from '../utils/httpError';
 
 export async function register(req: Request, res: Response): Promise<void> {
   try {
@@ -7,7 +8,7 @@ export async function register(req: Request, res: Response): Promise<void> {
     const result = await registerUser({ email, password });
     res.status(201).json(result);
   } catch (err) {
-    handleAuthError(err, res);
+    sendError(res, err, 'Unexpected auth error:');
   }
 }
 
@@ -17,18 +18,6 @@ export async function login(req: Request, res: Response): Promise<void> {
     const result = await loginUser({ email, password });
     res.status(200).json(result);
   } catch (err) {
-    handleAuthError(err, res);
+    sendError(res, err, 'Unexpected auth error:');
   }
-}
-
-// Maps AuthError -> its carried status code (400/401/409); anything else is an
-// unexpected 500.
-function handleAuthError(err: unknown, res: Response): void {
-  if (err instanceof AuthError) {
-    res.status(err.statusCode).json({ message: err.message });
-    return;
-  }
-  // eslint-disable-next-line no-console
-  console.error('Unexpected auth error:', err);
-  res.status(500).json({ message: 'Internal server error' });
 }

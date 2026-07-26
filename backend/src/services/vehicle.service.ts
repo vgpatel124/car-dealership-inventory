@@ -1,17 +1,22 @@
-// Vehicle service — business logic layer for the inventory catalog.
-//
-// listVehicles / createVehicle / searchVehicles are implemented below. The
-// remaining functions are still TDD targets and throw until implemented.
+// Vehicle service — business logic layer for the inventory catalog
+// (list / create / search / update / delete / purchase / restock).
 
 import { Prisma, Vehicle } from '@prisma/client';
 import prisma from '../utils/prisma';
+import { HttpError } from '../utils/httpError';
+
+// Prisma's "record to update/delete does not exist" code.
+const PRISMA_RECORD_NOT_FOUND = 'P2025';
 
 // Domain error that carries an HTTP status so the controller can map it
 // directly instead of guessing from the message (mirrors AuthError).
-export class VehicleError extends Error {
-  constructor(public readonly statusCode: number, message: string) {
-    super(message);
-    this.name = 'VehicleError';
+export class VehicleError extends HttpError {}
+
+// Rejects anything that isn't a finite, non-negative number with a 400 — shared
+// by create and update for the price/quantity fields.
+function assertNonNegativeNumber(value: number, field: string): void {
+  if (typeof value !== 'number' || Number.isNaN(value) || value < 0) {
+    throw new VehicleError(400, `${field} must be a non-negative number`);
   }
 }
 
@@ -59,12 +64,8 @@ export async function createVehicle(input: VehicleInput): Promise<Vehicle> {
   if (!make || !model || !category || price === undefined || price === null) {
     throw new VehicleError(400, 'make, model, category and price are required');
   }
-  if (typeof price !== 'number' || Number.isNaN(price) || price < 0) {
-    throw new VehicleError(400, 'price must be a non-negative number');
-  }
-  if (typeof quantity !== 'number' || Number.isNaN(quantity) || quantity < 0) {
-    throw new VehicleError(400, 'quantity must be a non-negative number');
-  }
+  assertNonNegativeNumber(price, 'price');
+  assertNonNegativeNumber(quantity, 'quantity');
 
   return prisma.vehicle.create({
     data: { make, model, category, price, quantity },
@@ -124,15 +125,11 @@ export async function updateVehicle(id: string, input: Partial<VehicleInput>): P
     data.category = category;
   }
   if (input.price !== undefined) {
-    if (typeof input.price !== 'number' || Number.isNaN(input.price) || input.price < 0) {
-      throw new VehicleError(400, 'price must be a non-negative number');
-    }
+    assertNonNegativeNumber(input.price, 'price');
     data.price = input.price;
   }
   if (input.quantity !== undefined) {
-    if (typeof input.quantity !== 'number' || Number.isNaN(input.quantity) || input.quantity < 0) {
-      throw new VehicleError(400, 'quantity must be a non-negative number');
-    }
+    assertNonNegativeNumber(input.quantity, 'quantity');
     data.quantity = input.quantity;
   }
 
@@ -221,7 +218,7 @@ export async function restockVehicle(id: string, qty = 1): Promise<Vehicle> {
 // Translates Prisma's "record to update/delete not found" (P2025) into a 404
 // VehicleError; anything else is re-thrown unchanged for the controller's 500.
 function mapNotFound(err: unknown): unknown {
-  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === PRISMA_RECORD_NOT_FOUND) {
     return new VehicleError(404, 'Vehicle not found');
   }
   return err;

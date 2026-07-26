@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import {
-  VehicleError,
   createVehicle as createVehicleService,
   listVehicles as listVehiclesService,
   searchVehicles as searchVehiclesService,
@@ -11,6 +10,9 @@ import {
   VehicleInput,
   VehicleSearchFilters,
 } from '../services/vehicle.service';
+import { sendError } from '../utils/httpError';
+
+const VEHICLE_ERROR_LABEL = 'Unexpected vehicle error:';
 
 // All vehicle handlers are wired to the service layer.
 
@@ -20,7 +22,7 @@ export async function createVehicle(req: Request, res: Response): Promise<void> 
     const vehicle = await createVehicleService({ make, model, category, price, quantity });
     res.status(201).json(vehicle);
   } catch (err) {
-    handleVehicleError(err, res);
+    sendError(res, err, VEHICLE_ERROR_LABEL);
   }
 }
 
@@ -29,7 +31,7 @@ export async function listVehicles(_req: Request, res: Response): Promise<void> 
     const vehicles = await listVehiclesService();
     res.status(200).json(vehicles);
   } catch (err) {
-    handleVehicleError(err, res);
+    sendError(res, err, VEHICLE_ERROR_LABEL);
   }
 }
 
@@ -39,7 +41,7 @@ export async function searchVehicles(req: Request, res: Response): Promise<void>
     const vehicles = await searchVehiclesService(filters);
     res.status(200).json(vehicles);
   } catch (err) {
-    handleVehicleError(err, res);
+    sendError(res, err, VEHICLE_ERROR_LABEL);
   }
 }
 
@@ -66,18 +68,6 @@ function parseSearchFilters(query: Request['query']): VehicleSearchFilters {
   return filters;
 }
 
-// Maps VehicleError -> its carried status code (e.g. 400); anything else is an
-// unexpected 500 (mirrors the auth controller's handler).
-function handleVehicleError(err: unknown, res: Response): void {
-  if (err instanceof VehicleError) {
-    res.status(err.statusCode).json({ message: err.message });
-    return;
-  }
-  // eslint-disable-next-line no-console
-  console.error('Unexpected vehicle error:', err);
-  res.status(500).json({ message: 'Internal server error' });
-}
-
 export async function updateVehicle(req: Request, res: Response): Promise<void> {
   try {
     const { make, model, category, price, quantity } = req.body ?? {};
@@ -90,7 +80,7 @@ export async function updateVehicle(req: Request, res: Response): Promise<void> 
     const vehicle = await updateVehicleService(req.params.id, patch);
     res.status(200).json(vehicle);
   } catch (err) {
-    handleVehicleError(err, res);
+    sendError(res, err, VEHICLE_ERROR_LABEL);
   }
 }
 
@@ -99,7 +89,7 @@ export async function deleteVehicle(req: Request, res: Response): Promise<void> 
     await deleteVehicleService(req.params.id);
     res.status(204).send();
   } catch (err) {
-    handleVehicleError(err, res);
+    sendError(res, err, VEHICLE_ERROR_LABEL);
   }
 }
 
@@ -108,7 +98,7 @@ export async function purchaseVehicle(req: Request, res: Response): Promise<void
     const vehicle = await purchaseVehicleService(req.params.id);
     res.status(200).json(vehicle);
   } catch (err) {
-    handleVehicleError(err, res);
+    sendError(res, err, VEHICLE_ERROR_LABEL);
   }
 }
 
@@ -119,6 +109,6 @@ export async function restockVehicle(req: Request, res: Response): Promise<void>
     const vehicle = await restockVehicleService(req.params.id, qty);
     res.status(200).json(vehicle);
   } catch (err) {
-    handleVehicleError(err, res);
+    sendError(res, err, VEHICLE_ERROR_LABEL);
   }
 }

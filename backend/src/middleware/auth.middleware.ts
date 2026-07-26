@@ -1,6 +1,8 @@
 import { NextFunction, Request, Response } from 'express';
 import { verifyToken, JwtPayload } from '../utils/jwt';
 
+const BEARER_PREFIX = 'Bearer ';
+
 // Augment Express's Request so downstream handlers can read `req.user` in a
 // type-safe way after `authenticate` has run.
 declare global {
@@ -22,12 +24,12 @@ declare global {
 export function authenticate(req: Request, res: Response, next: NextFunction): void {
   const header = req.headers.authorization;
 
-  if (!header || !header.startsWith('Bearer ')) {
+  if (!header || !header.startsWith(BEARER_PREFIX)) {
     res.status(401).json({ message: 'Missing or malformed Authorization header' });
     return;
   }
 
-  const token = header.slice('Bearer '.length).trim();
+  const token = header.slice(BEARER_PREFIX.length).trim();
   if (!token) {
     res.status(401).json({ message: 'Missing bearer token' });
     return;

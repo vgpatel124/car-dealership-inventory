@@ -282,6 +282,30 @@ describe('Vehicle API', () => {
 
       expect(res.status).toBe(404);
     });
+
+    // Same non-negative-number guard (assertNonNegativeNumber) that createVehicle
+    // exercises, now enforced on the update path too.
+    it('returns 400 when updating with a negative price', async () => {
+      const vehicle = await createVehicle({ price: 20000, quantity: 5 });
+
+      const res = await request(app)
+        .put(`/api/vehicles/${vehicle.id}`)
+        .set('Authorization', bearer(token))
+        .send({ price: -1 });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 when updating with a negative quantity', async () => {
+      const vehicle = await createVehicle({ price: 20000, quantity: 5 });
+
+      const res = await request(app)
+        .put(`/api/vehicles/${vehicle.id}`)
+        .set('Authorization', bearer(token))
+        .send({ quantity: -5 });
+
+      expect(res.status).toBe(400);
+    });
   });
 
   describe('DELETE /api/vehicles/:id', () => {

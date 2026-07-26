@@ -73,17 +73,6 @@ Copy the template below to the bottom of the log for each new prompt.
   against a dummy hash when the user isn't found, to avoid a user-enumeration
   side channel). Reviewed the diff before committing.
 
-### 2026-07-26 — Git recovery after a folder-flattening mishap
-- **Tool/Model:** Claude (Anthropic), troubleshooting conversation
-- **Prompt:** (not a code-generation prompt) — asked for help after a `mv`
-  command intended to flatten a nested project folder instead matched `..`
-  and left a stray empty `.git` repo at the home directory, making the
-  original scaffold + auth commits unreachable from the project folder.
-- **Outcome:** Confirmed no project files were lost and nothing had been
-  pushed to GitHub yet. Removed the stray empty repo, re-initialized git
-  cleanly inside the correct project folder, and made one honest commit
-  (`chore: restore project locally after a git tooling mishap...`) documenting
-  the recovery rather than fabricating the original two-commit history.
 
 ### 2026-07-26 — Vehicle update, delete, purchase, restock (TDD)
 - **Tool/Model:** Cursor + Claude Opus 4.8
@@ -213,7 +202,7 @@ Copy the template below to the bottom of the log for each new prompt.
 ### 2026-07-26 — Purchase interaction: loading state, toast, animated gauge
 - **Tool/Model:** Cursor + Claude Opus 4.8
 - **Prompt:**
-  > Add a "Purchasing..." disabled button state during the request, a
+  > Follow CONVENTIONS.md and Add a "Purchasing..." disabled button state during the request, a
   > moss-toned auto-dismissing success toast, an animated StockGauge
   > transition (stroke-dashoffset + rotated needle instead of redrawing the
   > arc), and a proper zero-quantity transition (ember gauge, "Out of stock"
@@ -226,7 +215,7 @@ Copy the template below to the bottom of the log for each new prompt.
 ### 2026-07-26 — Auth screen hero visual and dashboard hover polish
 - **Tool/Model:** Cursor + Claude Opus 4.8
 - **Prompt:**
-  > Add an inline line-art car SVG and subtitle above the logo on the
+  > Follow CONVENTIONS.md and Add an inline line-art car SVG and subtitle above the logo on the
   > login/register screen, a subtle gradient background (existing tokens
   > only), and a lift-on-hover transition on VehicleCard (respecting
   > prefers-reduced-motion), keeping StockGauge as the clear focal point.
@@ -236,16 +225,13 @@ Copy the template below to the bottom of the log for each new prompt.
 ### 2026-07-26 — Register should not auto-login
 - **Tool/Model:** Cursor + Claude Opus 4.8
 - **Prompt:**
-  > Registration currently logs the user in immediately via the token in the
-  > response. Change this so a successful register shows a success message
-  > and switches to the login view (email pre-filled), requiring the user to
-  > enter their password and click Login separately.
+  > Follow CONVENTIONS.md and Registration currently logs the user in immediately via the token in the response. Change this so a successful register shows a success message and switches to the login view (email pre-filled), requiring the user to enter their password and click Login separately.
 - **Outcome:** Frontend-only flow change; backend register test unaffected.
 
 ### 2026-07-26 — Session guard: never show login screen while authenticated
 - **Tool/Model:** Cursor + Claude Opus 4.8
 - **Prompt:**
-  > Add a guard so AuthPanel never renders while AuthContext has a valid
+  > Follow CONVENTIONS.md and Add a guard so AuthPanel never renders while AuthContext has a valid
   > user/token — including after browser back/forward navigation — and
   > confirm logout fully clears context back to AuthPanel with no residual
   > Dashboard flash. Token storage stays React-state-only, no persistence
