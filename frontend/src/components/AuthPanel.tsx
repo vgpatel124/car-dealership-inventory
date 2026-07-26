@@ -11,22 +11,34 @@ export default function AuthPanel() {
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const switchMode = (next: Mode) => {
     setMode(next);
     setError(null);
+    // Clear the register-only field so a stale mismatch error can't linger when
+    // switching modes.
+    setConfirmPassword('');
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (mode === 'register' && password !== confirmPassword) {
+      // Frontend-only check: bail before touching the API so no request fires.
+      setError("Passwords don't match");
+      return;
+    }
+
     setSubmitting(true);
     try {
       if (mode === 'login') {
         await login(email, password);
       } else {
+        // Confirm Password is validation-only; the API takes { email, password }.
         await register(email, password);
       }
     } catch (err) {
@@ -100,6 +112,24 @@ export default function AuthPanel() {
                 placeholder="••••••••"
               />
             </div>
+
+            {mode === 'register' && (
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="confirmPassword" className="text-sm font-medium text-ink/80">
+                  Confirm password
+                </label>
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="rounded-lg border border-ink/20 bg-white px-3 py-2 text-sm text-ink placeholder:text-ink/40"
+                  placeholder="••••••••"
+                />
+              </div>
+            )}
 
             {error && (
               <p
