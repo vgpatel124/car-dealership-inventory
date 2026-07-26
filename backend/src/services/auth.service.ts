@@ -16,6 +16,13 @@ export class AuthError extends Error {
 
 const SALT_ROUNDS = 10;
 
+// Single source of truth for password hashing. registerUser and the Prisma seed
+// script both call this so every stored hash uses bcryptjs with the same cost
+// factor — never duplicate a different hashing approach elsewhere.
+export function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, SALT_ROUNDS);
+}
+
 export interface RegisterInput {
   email: string;
   password: string;
@@ -59,7 +66,7 @@ export async function registerUser(input: RegisterInput): Promise<AuthResult> {
     throw new AuthError(400, 'Email and password are required');
   }
 
-  const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+  const passwordHash = await hashPassword(password);
 
   let user;
   try {

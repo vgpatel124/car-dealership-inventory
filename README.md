@@ -90,10 +90,15 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 npx prisma generate
 npx prisma migrate dev --name init
+npx prisma db seed   # seeds test accounts + sample vehicles (idempotent)
 
 npm test          # runs Jest + Supertest
 npm run dev       # starts the API on http://localhost:4000
 ```
+
+The seed (`backend/prisma/seed.ts`) is idempotent — re-running it updates the
+same rows rather than creating duplicates — so it's safe to run any time you want
+to reset the local data to a known, review-ready state.
 
 Environment variables (see `.env.example`):
 
@@ -103,6 +108,24 @@ Environment variables (see `.env.example`):
 | `JWT_SECRET`     | (generated hex)      | Signs/verifies JWTs            |
 | `JWT_EXPIRES_IN` | `1d`                 | Token lifetime                 |
 | `PORT`           | `4000`               | API port                       |
+
+#### Test accounts
+
+After running `npx prisma db seed`, two accounts are available for local review:
+
+| Role  | Email                   | Password    |
+| ----- | ----------------------- | ----------- |
+| Admin | `admin@drivestock.test` | `Admin123!` |
+| User  | `user@drivestock.test`  | `User123!`  |
+
+> These are **seed data for local review only** — not real credentials. The
+> passwords are hashed with bcryptjs (same helper as `registerUser`) before being
+> stored. Never reuse them anywhere real.
+
+The admin account can add / edit / delete / restock vehicles immediately; the
+user account is a normal browse-and-purchase login. The seed also loads 8 sample
+vehicles across Sedan / Truck / SUV / Coupe with varied stock, including two at
+quantity 0 so the "Sold out" state is visible right away.
 
 #### Promoting a user to ADMIN (local testing)
 
