@@ -4,11 +4,15 @@ import {
   createVehicle as createVehicleService,
   listVehicles as listVehiclesService,
   searchVehicles as searchVehiclesService,
+  updateVehicle as updateVehicleService,
+  deleteVehicle as deleteVehicleService,
+  purchaseVehicle as purchaseVehicleService,
+  restockVehicle as restockVehicleService,
+  VehicleInput,
   VehicleSearchFilters,
 } from '../services/vehicle.service';
 
-// list / create / search are wired to the service layer. The remaining handlers
-// are still stubbed to 501 (Red state for TDD) and point at their service TODO.
+// All vehicle handlers are wired to the service layer.
 
 export async function createVehicle(req: Request, res: Response): Promise<void> {
   try {
@@ -74,26 +78,47 @@ function handleVehicleError(err: unknown, res: Response): void {
   res.status(500).json({ message: 'Internal server error' });
 }
 
-export async function updateVehicle(_req: Request, res: Response): Promise<void> {
-  res.status(501).json({
-    message: 'Not implemented. See TODO(updateVehicle) in src/services/vehicle.service.ts',
-  });
+export async function updateVehicle(req: Request, res: Response): Promise<void> {
+  try {
+    const { make, model, category, price, quantity } = req.body ?? {};
+    const patch: Partial<VehicleInput> = { make, model, category, price, quantity };
+    // Drop keys the caller didn't send so this stays a genuine partial update.
+    (Object.keys(patch) as (keyof VehicleInput)[]).forEach((key) => {
+      if (patch[key] === undefined) delete patch[key];
+    });
+
+    const vehicle = await updateVehicleService(req.params.id, patch);
+    res.status(200).json(vehicle);
+  } catch (err) {
+    handleVehicleError(err, res);
+  }
 }
 
-export async function deleteVehicle(_req: Request, res: Response): Promise<void> {
-  res.status(501).json({
-    message: 'Not implemented. See TODO(deleteVehicle) in src/services/vehicle.service.ts',
-  });
+export async function deleteVehicle(req: Request, res: Response): Promise<void> {
+  try {
+    await deleteVehicleService(req.params.id);
+    res.status(204).send();
+  } catch (err) {
+    handleVehicleError(err, res);
+  }
 }
 
-export async function purchaseVehicle(_req: Request, res: Response): Promise<void> {
-  res.status(501).json({
-    message: 'Not implemented. See TODO(purchaseVehicle) in src/services/vehicle.service.ts',
-  });
+export async function purchaseVehicle(req: Request, res: Response): Promise<void> {
+  try {
+    const vehicle = await purchaseVehicleService(req.params.id);
+    res.status(200).json(vehicle);
+  } catch (err) {
+    handleVehicleError(err, res);
+  }
 }
 
-export async function restockVehicle(_req: Request, res: Response): Promise<void> {
-  res.status(501).json({
-    message: 'Not implemented. See TODO(restockVehicle) in src/services/vehicle.service.ts',
-  });
+export async function restockVehicle(req: Request, res: Response): Promise<void> {
+  try {
+    const rawQty = (req.body ?? {}).qty;
+    const qty = rawQty === undefined ? 1 : Number(rawQty);
+    const vehicle = await restockVehicleService(req.params.id, qty);
+    res.status(200).json(vehicle);
+  } catch (err) {
+    handleVehicleError(err, res);
+  }
 }

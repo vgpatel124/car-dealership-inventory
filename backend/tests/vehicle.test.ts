@@ -1,7 +1,7 @@
 import request from 'supertest';
 import app from '../src/app';
 import prisma from '../src/utils/prisma';
-import { registerAndGetToken, bearer } from './helpers/auth';
+import { registerAndGetToken, registerAdminAndGetToken, bearer } from './helpers/auth';
 
 // RED tests for the vehicle catalog endpoints (create / list / search).
 //
@@ -17,10 +17,37 @@ const tag = () => `t${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
 
 describe('Vehicle API', () => {
   let token: string;
+  let adminToken: string;
 
   beforeAll(async () => {
     ({ token } = await registerAndGetToken(app));
+    ({ token: adminToken } = await registerAdminAndGetToken(app));
   });
+
+  // Creates a vehicle through the real endpoint and returns the created record.
+  // Defaults to the ADMIN caller so it works for admin-only flows too.
+  const createVehicle = async (
+    overrides: Partial<{ make: string; model: string; category: string; price: number; quantity: number }> = {},
+    callerToken: string = adminToken,
+  ) => {
+    const payload = {
+      make: `Make${tag()}`,
+      model: `Model${tag()}`,
+      category: 'Sedan',
+      price: 20000,
+      quantity: 5,
+      ...overrides,
+    };
+    const res = await request(app)
+      .post('/api/vehicles')
+      .set('Authorization', bearer(callerToken))
+      .send(payload);
+    expect(res.status).toBe(201);
+    return res.body as { id: string; quantity: number; price: number; [k: string]: unknown };
+  };
+
+  // A syntactically valid UUID that should never exist in the DB.
+  const MISSING_ID = '00000000-0000-0000-0000-000000000000';
 
   describe('POST /api/vehicles', () => {
     it('requires authentication (401 without a token)', async () => {
@@ -186,6 +213,162 @@ describe('Vehicle API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual([]);
+    });
+  });
+
+  describe('PUT /api/vehicles/:id', () => {
+    it('requires authentication (401 without a token)', async () => {
+      const res = await request(app).put(`/api/vehicles/${MISSING_ID}`).send({ price: 1 });
+      expect(res.status).toBe(401);
+    });
+
+    it('updates fields and returns 200 with the updated vehicle', async () => {
+      const vehicle = await createVehicle({ price: 20000, quantity: 5 });
+
+      const res = await request(app)
+        .put(`/api/vehicles/${vehicle.id}`)
+        .set('Authorization', bearer(token))
+        .send({ price: 25999, quantity: 9, category: 'Coupe' });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        id: vehicle.id,
+        price: 25999,
+        quantity: 9,
+        category: 'Coupe',
+      });
+    });
+
+    it('returns 404 when the vehicle does not exist', async () => {
+      const res = await request(app)
+        .put(`/api/vehicles/${MISSING_ID}`)
+        .set('Authorization', bearer(token))
+        .send({ price: 12345 });
+
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('DELETE /api/vehicles/:id', () => {
+    it('requires authentication (401 without a token)', async () => {
+      const res = await request(app).delete(`/api/vehicles/${MISSING_ID}`);
+      expect(res.status).toBe(401);
+    });
+
+    it('forbids a USER caller (403)', async () => {
+      const vehicle = await createVehicle();
+
+      const res = await request(app)
+        .delete(`/api/vehicles/${vehicle.id}`)
+        .set('Authorization', bearer(token));
+
+      expect(res.status).toBe(403);
+    });
+
+    it('lets an ADMIN delete a vehicle (200/204)', async () => {
+      const vehicle = await createVehicle();
+
+      const res = await request(app)
+        .delete(`/api/vehicles/${vehicle.id}`)
+        .set('Authorization', bearer(adminToken));
+
+      expect([200, 204]).toContain(res.status);
+
+      // The row should really be gone.
+      const persisted = await prisma.vehicle.findUnique({ where: { id: vehicle.id } });
+      expect(persisted).toBeNull();
+    });
+
+    it('returns 404 when an ADMIN deletes a non-existent vehicle', async () => {
+      const res = await request(app)
+        .delete(`/api/vehicles/${MISSING_ID}`)
+        .set('Authorization', bearer(adminToken));
+
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('POST /api/vehicles/:id/purchase', () => {
+    it('requires authentication (401 without a token)', async () => {
+      const res = await request(app).post(`/api/vehicles/${MISSING_ID}/purchase`);
+      expect(res.status).toBe(401);
+    });
+
+    it('decrements quantity by exactly 1 and returns 200', async () => {
+      const vehicle = await createVehicle({ quantity: 3 });
+
+      const res = await request(app)
+        .post(`/api/vehicles/${vehicle.id}/purchase`)
+        .set('Authorization', bearer(token));
+
+      expect(res.status).toBe(200);
+      expect(res.body.quantity).toBe(2);
+
+      // Confirm the decrement was persisted, not just echoed.
+      const persisted = await prisma.vehicle.findUnique({ where: { id: vehicle.id } });
+      expect(persisted?.quantity).toBe(2);
+    });
+
+    it('returns 409 when quantity is already 0', async () => {
+      const vehicle = await createVehicle({ quantity: 0 });
+
+      const res = await request(app)
+        .post(`/api/vehicles/${vehicle.id}/purchase`)
+        .set('Authorization', bearer(token));
+
+      expect(res.status).toBe(409);
+    });
+
+    it('handles two concurrent purchases of the last unit: exactly one 200 and one 409', async () => {
+      const vehicle = await createVehicle({ quantity: 1 });
+
+      // Fire both at once (Promise.all, NOT sequential awaits) so they race on
+      // the same last unit. The atomic guarded updateMany must let exactly one
+      // win and force the other to 409 — no overselling.
+      const [a, b] = await Promise.all([
+        request(app).post(`/api/vehicles/${vehicle.id}/purchase`).set('Authorization', bearer(token)),
+        request(app).post(`/api/vehicles/${vehicle.id}/purchase`).set('Authorization', bearer(token)),
+      ]);
+
+      const statuses = [a.status, b.status].sort();
+      expect(statuses).toEqual([200, 409]);
+
+      // Stock must never go negative — the loser did not oversell.
+      const persisted = await prisma.vehicle.findUnique({ where: { id: vehicle.id } });
+      expect(persisted?.quantity).toBe(0);
+    });
+  });
+
+  describe('POST /api/vehicles/:id/restock', () => {
+    it('requires authentication (401 without a token)', async () => {
+      const res = await request(app).post(`/api/vehicles/${MISSING_ID}/restock`).send({ qty: 5 });
+      expect(res.status).toBe(401);
+    });
+
+    it('forbids a USER caller (403)', async () => {
+      const vehicle = await createVehicle({ quantity: 2 });
+
+      const res = await request(app)
+        .post(`/api/vehicles/${vehicle.id}/restock`)
+        .set('Authorization', bearer(token))
+        .send({ qty: 5 });
+
+      expect(res.status).toBe(403);
+    });
+
+    it('lets an ADMIN increment quantity by the given amount (200)', async () => {
+      const vehicle = await createVehicle({ quantity: 2 });
+
+      const res = await request(app)
+        .post(`/api/vehicles/${vehicle.id}/restock`)
+        .set('Authorization', bearer(adminToken))
+        .send({ qty: 5 });
+
+      expect(res.status).toBe(200);
+      expect(res.body.quantity).toBe(7);
+
+      const persisted = await prisma.vehicle.findUnique({ where: { id: vehicle.id } });
+      expect(persisted?.quantity).toBe(7);
     });
   });
 });

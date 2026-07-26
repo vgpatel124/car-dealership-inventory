@@ -1,5 +1,7 @@
 import request from 'supertest';
 import type { Application } from 'express';
+import bcrypt from 'bcryptjs';
+import prisma from '../../src/utils/prisma';
 
 // Shared auth setup for tests that need a logged-in caller. Rather than poking
 // at the auth service internals, this drives the REAL /api/auth endpoints so the
@@ -38,6 +40,40 @@ export async function registerAndGetToken(app: Application): Promise<AuthContext
   }
 
   return { token: res.body.token as string, user: res.body.user };
+}
+
+/**
+ * Creates an ADMIN user and returns a valid JWT for it.
+ *
+ * The public POST /api/auth/register endpoint only ever creates USER-role
+ * accounts, so we insert the ADMIN row directly via Prisma (hashing the
+ * password exactly like the auth service does), then obtain the token through
+ * the REAL POST /api/auth/login endpoint — so the JWT carries role=ADMIN as it
+ * would in production, without duplicating the token-signing logic here.
+ */
+export async function registerAdminAndGetToken(app: Application): Promise<AuthContext> {
+  const email = uniqueEmail();
+  const password = 'sup3r-secret-admin';
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  const user = await prisma.user.create({
+    data: { email, passwordHash, role: 'ADMIN' },
+  });
+
+  const res = await request(app).post('/api/auth/login').send({ email, password });
+
+  if (res.status !== 200 || !res.body?.token) {
+    throw new Error(
+      `Test setup failed: could not log in admin (status ${res.status}): ${JSON.stringify(
+        res.body,
+      )}`,
+    );
+  }
+
+  return {
+    token: res.body.token as string,
+    user: { id: user.id, email: user.email, role: 'ADMIN' },
+  };
 }
 
 /** Formats a bearer Authorization header value for a given token. */

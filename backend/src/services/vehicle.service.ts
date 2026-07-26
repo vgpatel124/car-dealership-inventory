@@ -105,8 +105,42 @@ export async function searchVehicles(filters: VehicleSearchFilters): Promise<Veh
  *  3. If the id does not exist, Prisma throws P2025 — map to 404.
  *  4. Return the updated vehicle.
  */
-export async function updateVehicle(_id: string, _input: Partial<VehicleInput>): Promise<unknown> {
-  throw new Error('not implemented yet');
+export async function updateVehicle(id: string, input: Partial<VehicleInput>): Promise<Vehicle> {
+  const data: Prisma.VehicleUpdateInput = {};
+
+  if (input.make !== undefined) {
+    const make = input.make?.trim();
+    if (!make) throw new VehicleError(400, 'make must not be empty');
+    data.make = make;
+  }
+  if (input.model !== undefined) {
+    const model = input.model?.trim();
+    if (!model) throw new VehicleError(400, 'model must not be empty');
+    data.model = model;
+  }
+  if (input.category !== undefined) {
+    const category = input.category?.trim();
+    if (!category) throw new VehicleError(400, 'category must not be empty');
+    data.category = category;
+  }
+  if (input.price !== undefined) {
+    if (typeof input.price !== 'number' || Number.isNaN(input.price) || input.price < 0) {
+      throw new VehicleError(400, 'price must be a non-negative number');
+    }
+    data.price = input.price;
+  }
+  if (input.quantity !== undefined) {
+    if (typeof input.quantity !== 'number' || Number.isNaN(input.quantity) || input.quantity < 0) {
+      throw new VehicleError(400, 'quantity must be a non-negative number');
+    }
+    data.quantity = input.quantity;
+  }
+
+  try {
+    return await prisma.vehicle.update({ where: { id }, data });
+  } catch (err) {
+    throw mapNotFound(err);
+  }
 }
 
 /**
@@ -115,8 +149,12 @@ export async function updateVehicle(_id: string, _input: Partial<VehicleInput>):
  *  2. If the id does not exist (P2025), map to 404.
  *  3. Return void / a success indicator.
  */
-export async function deleteVehicle(_id: string): Promise<void> {
-  throw new Error('not implemented yet');
+export async function deleteVehicle(id: string): Promise<void> {
+  try {
+    await prisma.vehicle.delete({ where: { id } });
+  } catch (err) {
+    throw mapNotFound(err);
+  }
 }
 
 /**
@@ -132,8 +170,27 @@ export async function deleteVehicle(_id: string): Promise<void> {
  *    "Out of stock". This avoids the read-then-write race entirely.
  *  - Return the updated vehicle.
  */
-export async function purchaseVehicle(_id: string, _qty = 1): Promise<unknown> {
-  throw new Error('not implemented yet');
+export async function purchaseVehicle(id: string, qty = 1): Promise<Vehicle> {
+  // Atomic guarded decrement: a single updateMany that only touches the row when
+  // stock is still available. Because the guard and the write are one statement,
+  // concurrent buyers can't both pass a stale read — the DB serializes them, so
+  // exactly one wins the last unit and the rest see count === 0. This is what
+  // prevents overselling under the concurrent-request test.
+  const { count } = await prisma.vehicle.updateMany({
+    where: { id, quantity: { gt: 0 } },
+    data: { quantity: { decrement: qty } },
+  });
+
+  if (count === 0) {
+    // Either the vehicle is out of stock or it doesn't exist; a follow-up read
+    // tells the two apart so we can return the right status.
+    const existing = await prisma.vehicle.findUnique({ where: { id } });
+    if (!existing) throw new VehicleError(404, 'Vehicle not found');
+    throw new VehicleError(409, 'Out of stock');
+  }
+
+  // Guaranteed to exist since the update above succeeded.
+  return (await prisma.vehicle.findUnique({ where: { id } })) as Vehicle;
 }
 
 /**
@@ -146,6 +203,26 @@ export async function purchaseVehicle(_id: string, _qty = 1): Promise<unknown> {
  *  - Validate qty > 0 (controller returns 400 otherwise).
  *  - Map missing id (P2025) to 404. Return the updated vehicle.
  */
-export async function restockVehicle(_id: string, _qty = 1): Promise<unknown> {
-  throw new Error('not implemented yet');
+export async function restockVehicle(id: string, qty = 1): Promise<Vehicle> {
+  if (typeof qty !== 'number' || Number.isNaN(qty) || qty <= 0) {
+    throw new VehicleError(400, 'restock quantity must be a positive number');
+  }
+
+  try {
+    return await prisma.vehicle.update({
+      where: { id },
+      data: { quantity: { increment: qty } },
+    });
+  } catch (err) {
+    throw mapNotFound(err);
+  }
+}
+
+// Translates Prisma's "record to update/delete not found" (P2025) into a 404
+// VehicleError; anything else is re-thrown unchanged for the controller's 500.
+function mapNotFound(err: unknown): unknown {
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+    return new VehicleError(404, 'Vehicle not found');
+  }
+  return err;
 }
