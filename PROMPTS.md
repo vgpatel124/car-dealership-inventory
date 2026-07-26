@@ -73,6 +73,17 @@ Copy the template below to the bottom of the log for each new prompt.
   against a dummy hash when the user isn't found, to avoid a user-enumeration
   side channel). Reviewed the diff before committing.
 
+### 2026-07-26 — Git recovery after a folder-flattening mishap
+- **Tool/Model:** Claude (Anthropic), troubleshooting conversation
+- **Prompt:** (not a code-generation prompt) — asked for help after a mv
+command intended to flatten a nested project folder instead matched ..
+and left a stray empty .git repo at the home directory, making the
+original scaffold + auth commits unreachable from the project folder.
+- **Outcome:** Confirmed no project files were lost and nothing had been
+pushed to GitHub yet. Removed the stray empty repo, re-initialized git
+cleanly inside the correct project folder, and made one honest commit
+(chore: restore project locally after a git tooling mishap...) documenting
+the recovery rather than fabricating the original two-commit history.
 
 ### 2026-07-26 — Vehicle update, delete, purchase, restock (TDD)
 - **Tool/Model:** Cursor + Claude Opus 4.8
@@ -239,3 +250,57 @@ Copy the template below to the bottom of the log for each new prompt.
 - **Outcome:** Confirmed and hardened the existing single unconditional
   render check in App.tsx; verified manually with back-navigation after
   login and after logout.
+
+### 2026-07-26 — Backend code quality review (no behavior change)
+- **Tool/Model:** Cursor + Claude Opus 4.8
+- **Prompt:**
+  > Perform a final code quality review, backend only. Do not change
+  > behavior, APIs, schema, UI, or tests except for lint/type fixes. Remove
+  > duplicate code, improve names, replace magic values with named
+  > constants, improve error-handling consistency, remove dead code, keep
+  > functions small. Remove comments that just restate the code; keep only
+  > comments explaining non-obvious logic, security, or concurrency. Prove
+  > no behavior changed with before/after test runs.
+- **Outcome:** Introduced a shared `HttpError` base + `sendError` handler,
+  collapsing `AuthError`/`VehicleError` and duplicate controller handlers.
+  Extracted `requireCredentials()`/`toPublicUser()` and
+  `assertNonNegativeNumber()` to dedupe repeated validation. Named several
+  magic values (`PRISMA_UNIQUE_VIOLATION`, `DUMMY_BCRYPT_HASH`,
+  `PRISMA_RECORD_NOT_FOUND`, `BEARER_PREFIX`, `DEFAULT_JWT_EXPIRES_IN`).
+  Corrected a stale file-header comment falsely claiming several vehicle
+  service functions were still unimplemented. 40/40 tests passed before and
+  after, tsc clean. Specifically re-verified by name that the
+  concurrent-purchase race-condition test and the login timing-mitigation
+  test both still passed.
+
+### 2026-07-26 — Follow-up: branch coverage investigation + PUT validation test
+- **Tool/Model:** Cursor + Claude Opus 4.8
+- **Prompt:**
+  > Branch coverage dropped slightly (75.70% -> 74.72%) after the refactor
+  > — explain exactly which branches changed and whether a real gap was
+  > introduced, not just a denominator shift. If a genuine gap exists (e.g.
+  > PUT never tested for negative price/quantity), add that test.
+- **Outcome:** Confirmed the drop was mechanical (consolidating four inline
+  checks into one shared, above-average-covered branch cluster lowers the
+  file's average even though auth.service.ts hit 100% and two previously
+  dead branches were eliminated). Added two tests confirming
+  `PUT /api/vehicles/:id` already correctly rejects negative price/quantity
+  via the same shared guard `createVehicle` uses — these were "already
+  green" (locking in existing correct behavior), not a bug fix. Test count
+  40 -> 42, all passing.
+
+### 2026-07-26 — Frontend code quality review and comment cleanup (no behavior change)
+- **Tool/Model:** Cursor + Claude Opus 4.8
+- **Prompt:**
+  > Perform a final code quality review, frontend only, plus a comments
+  > pass across both frontend and backend. Remove duplicate JSX, simplify
+  > component structure, remove unnecessary state/props (flag anything
+  > uncertain rather than guessing), remove dead code/unused imports.
+  > Remove comments that just restate the code; keep only ones explaining
+  > non-obvious business logic, security, or concurrency. No test suite
+  > exists on the frontend, so list every interactive element that could
+  > plausibly be affected so I can manually re-verify.
+- **Outcome:** `npm run build` clean before and after. Manually re-verified
+  registration, login, purchase (both partial-stock and sold-out paths),
+  combined-filter search, the full admin flow, and the mobile drawer — all
+  behaved identically to before the pass.
