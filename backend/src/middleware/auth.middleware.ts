@@ -18,8 +18,6 @@ declare global {
  * Verifies a `Bearer <token>` Authorization header. On success attaches the
  * decoded payload to `req.user`. Responds 401 if the header is missing or the
  * token is invalid/expired.
- *
- * This is reusable infrastructure — it is fully implemented (not a TDD target).
  */
 export function authenticate(req: Request, res: Response, next: NextFunction): void {
   const header = req.headers.authorization;

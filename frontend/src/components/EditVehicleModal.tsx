@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { Vehicle } from '../types';
 import { VehicleInput } from '../lib/api';
 import Button from './Button';
+import { inputClass, labelClass } from './formStyles';
 
 interface EditVehicleModalProps {
   vehicle: Vehicle;
@@ -9,10 +10,6 @@ interface EditVehicleModalProps {
   onSave: (id: string, patch: Partial<VehicleInput>) => Promise<void>;
   onClose: () => void;
 }
-
-const inputClass =
-  'rounded-lg border border-ink/20 bg-white px-3 py-2 text-sm text-ink placeholder:text-ink/40';
-const labelClass = 'text-xs font-medium text-ink/60';
 
 // A small modal for editing a vehicle. Prefilled from the current record; only
 // changed fields are sent as a partial PUT.

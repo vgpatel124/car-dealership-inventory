@@ -1,16 +1,13 @@
 import { FormEvent, useState } from 'react';
 import Button from './Button';
 import { VehicleSearchFilters } from '../lib/api';
+import { inputClass, labelClass } from './formStyles';
 
 interface SearchBarProps {
   onSearch: (filters: VehicleSearchFilters) => void;
   onClear: () => void;
   busy?: boolean;
 }
-
-const inputClass =
-  'rounded-lg border border-ink/20 bg-white px-3 py-2 text-sm text-ink placeholder:text-ink/40';
-const labelClass = 'text-xs font-medium text-ink/60';
 
 // Explicit "Search" action (rather than debounced live search): it keeps request
 // volume predictable with several combinable fields, avoids out-of-order

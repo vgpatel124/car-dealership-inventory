@@ -1,15 +1,12 @@
 import { FormEvent, useState } from 'react';
 import Button from './Button';
 import { VehicleInput } from '../lib/api';
+import { inputClass, labelClass } from './formStyles';
 
 interface AddVehicleFormProps {
   // Resolves on success; rejects with an Error whose message is shown inline.
   onAdd: (input: VehicleInput) => Promise<void>;
 }
-
-const inputClass =
-  'rounded-lg border border-ink/20 bg-white px-3 py-2 text-sm text-ink placeholder:text-ink/40';
-const labelClass = 'text-xs font-medium text-ink/60';
 
 export default function AddVehicleForm({ onAdd }: AddVehicleFormProps) {
   const [make, setMake] = useState('');

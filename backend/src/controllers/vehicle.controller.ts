@@ -14,8 +14,6 @@ import { sendError } from '../utils/httpError';
 
 const VEHICLE_ERROR_LABEL = 'Unexpected vehicle error:';
 
-// All vehicle handlers are wired to the service layer.
-
 export async function createVehicle(req: Request, res: Response): Promise<void> {
   try {
     const { make, model, category, price, quantity } = req.body ?? {};

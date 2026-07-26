@@ -187,7 +187,6 @@ function Dashboard() {
       onClick: () => setView('inventory'),
     },
     { key: 'search', label: 'Search', active: false, onClick: goToSearch },
-    // Admin item is only offered to admins.
     ...(isAdmin
       ? [
           {
@@ -367,7 +366,6 @@ function Dashboard() {
         </div>
       )}
 
-      {/* Main canvas */}
       <main className="flex-1 px-6 py-8 md:px-10">
         {/* Mobile top bar with the hamburger toggle (<640px only). */}
         <div className="mb-6 flex items-center justify-between sm:hidden">

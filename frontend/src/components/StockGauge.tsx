@@ -16,7 +16,6 @@ export default function StockGauge({
   const max = Math.max(capacity ?? 10, quantity, 1);
   const fraction = Math.min(Math.max(quantity / max, 0), 1);
 
-  // State + color.
   let color = '#3E8F6F'; // moss (healthy)
   let label = 'In stock';
   if (quantity === 0) {

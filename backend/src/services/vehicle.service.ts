@@ -36,22 +36,10 @@ export interface VehicleSearchFilters {
   maxPrice?: number;
 }
 
-/**
- * TODO(listVehicles): Return all vehicles.
- *  - prisma.vehicle.findMany(), ideally ordered by createdAt desc.
- *  - Consider pagination later; for now return the full list.
- */
 export async function listVehicles(): Promise<Vehicle[]> {
   return prisma.vehicle.findMany({ orderBy: { createdAt: 'desc' } });
 }
 
-/**
- * TODO(createVehicle): Create a new vehicle.
- *  1. Validate required fields (make, model, category, price). Negative price
- *     or quantity should be rejected (controller returns 400).
- *  2. prisma.vehicle.create with quantity defaulting to 0 when omitted.
- *  3. Return the created vehicle.
- */
 export async function createVehicle(input: VehicleInput): Promise<Vehicle> {
   const make = input?.make?.trim();
   const model = input?.model?.trim();
@@ -72,13 +60,6 @@ export async function createVehicle(input: VehicleInput): Promise<Vehicle> {
   });
 }
 
-/**
- * TODO(searchVehicles): Filter vehicles by any combination of criteria.
- *  - All filters are optional and combinable (build a Prisma `where` object).
- *  - make/model/category: case-insensitive `contains` matches.
- *  - price range: gte minPrice and/or lte maxPrice when provided.
- *  - Relies on the make/model/category/price indexes in schema.prisma.
- */
 export async function searchVehicles(filters: VehicleSearchFilters): Promise<Vehicle[]> {
   const where: Prisma.VehicleWhereInput = {};
 
@@ -99,13 +80,6 @@ export async function searchVehicles(filters: VehicleSearchFilters): Promise<Veh
   return prisma.vehicle.findMany({ where, orderBy: { createdAt: 'desc' } });
 }
 
-/**
- * TODO(updateVehicle): Update an existing vehicle by id.
- *  1. Validate the payload (partial update of make/model/category/price/qty).
- *  2. prisma.vehicle.update({ where: { id }, data }).
- *  3. If the id does not exist, Prisma throws P2025 — map to 404.
- *  4. Return the updated vehicle.
- */
 export async function updateVehicle(id: string, input: Partial<VehicleInput>): Promise<Vehicle> {
   const data: Prisma.VehicleUpdateInput = {};
 
@@ -140,12 +114,6 @@ export async function updateVehicle(id: string, input: Partial<VehicleInput>): P
   }
 }
 
-/**
- * TODO(deleteVehicle): Delete a vehicle by id (ADMIN only — enforced at route).
- *  1. prisma.vehicle.delete({ where: { id } }).
- *  2. If the id does not exist (P2025), map to 404.
- *  3. Return void / a success indicator.
- */
 export async function deleteVehicle(id: string): Promise<void> {
   try {
     await prisma.vehicle.delete({ where: { id } });
@@ -154,19 +122,6 @@ export async function deleteVehicle(id: string): Promise<void> {
   }
 }
 
-/**
- * TODO(purchaseVehicle): Buy one (or `qty`) unit(s), decrementing stock.
- *  - MUST be atomic to avoid race conditions when two buyers hit the same
- *    vehicle concurrently. Do the decrement inside a transaction and guard the
- *    quantity, e.g.:
- *      prisma.vehicle.updateMany({
- *        where: { id, quantity: { gte: qty } },
- *        data: { quantity: { decrement: qty } },
- *      })
- *    then check the returned `count`: if 0, stock was insufficient → 409
- *    "Out of stock". This avoids the read-then-write race entirely.
- *  - Return the updated vehicle.
- */
 export async function purchaseVehicle(id: string, qty = 1): Promise<Vehicle> {
   // Atomic guarded decrement: a single updateMany that only touches the row when
   // stock is still available. Because the guard and the write are one statement,
@@ -190,22 +145,13 @@ export async function purchaseVehicle(id: string, qty = 1): Promise<Vehicle> {
   return (await prisma.vehicle.findUnique({ where: { id } })) as Vehicle;
 }
 
-/**
- * TODO(restockVehicle): Add `qty` units to stock (ADMIN only — enforced at route).
- *  - Atomic increment to avoid lost updates under concurrency:
- *      prisma.vehicle.update({
- *        where: { id },
- *        data: { quantity: { increment: qty } },
- *      })
- *  - Validate qty > 0 (controller returns 400 otherwise).
- *  - Map missing id (P2025) to 404. Return the updated vehicle.
- */
 export async function restockVehicle(id: string, qty = 1): Promise<Vehicle> {
   if (typeof qty !== 'number' || Number.isNaN(qty) || qty <= 0) {
     throw new VehicleError(400, 'restock quantity must be a positive number');
   }
 
   try {
+    // Atomic increment to avoid lost updates under concurrency.
     return await prisma.vehicle.update({
       where: { id },
       data: { quantity: { increment: qty } },
