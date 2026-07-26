@@ -35,6 +35,8 @@ function Dashboard() {
   const [cardErrors, setCardErrors] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<Vehicle | null>(null);
   const [view, setView] = useState<View>('inventory');
+  // Mobile-only: the ink sidebar collapses into a slide-out drawer below 640px.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
   // Guard: only admins can actually be in the admin view (defence in depth even
@@ -194,13 +196,70 @@ function Dashboard() {
       : []),
   ];
 
+  // Nav buttons are shared between the desktop sidebar and the mobile drawer.
+  // `onNavigate` lets the drawer close itself after a selection.
+  const renderNav = (onNavigate?: () => void) => (
+    <nav className="mt-10 flex flex-col gap-1">
+      {navItems.map((item) => (
+        <button
+          key={item.key}
+          type="button"
+          onClick={() => {
+            item.onClick();
+            onNavigate?.();
+          }}
+          aria-current={item.active ? 'page' : undefined}
+          className={`rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors ${
+            item.active
+              ? 'bg-white/10 text-white'
+              : 'text-paper/70 hover:bg-white/5 hover:text-white'
+          }`}
+        >
+          {item.label}
+        </button>
+      ))}
+    </nav>
+  );
+
   const showEmpty = !loading && !error && vehicles.length === 0;
+
+  // Shared vehicle-grid column rhythm: 1 col mobile → 2 (tablet) → 3 (desktop)
+  // → 4 (ultrawide). Reused by the skeleton grid so the loading state matches.
+  const gridClass = 'grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4';
+
+  // Skeleton placeholders shown while fetching/searching so there's no blank
+  // flash. `animate-pulse` is neutralised under prefers-reduced-motion.
+  const renderSkeletons = () => (
+    <>
+      <p role="status" className="sr-only">
+        Loading vehicles…
+      </p>
+      <section className={gridClass} aria-hidden="true">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex flex-col gap-4 rounded-2xl border border-ink/10 bg-white p-5 shadow-sm"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 space-y-2">
+                <div className="h-6 w-2/3 animate-pulse rounded bg-ink/10" />
+                <div className="h-4 w-1/3 animate-pulse rounded-full bg-ink/10" />
+              </div>
+              <div className="h-6 w-16 animate-pulse rounded bg-ink/10" />
+            </div>
+            <div className="mx-auto h-20 w-40 animate-pulse rounded-t-full bg-ink/5" />
+            <div className="h-10 w-full animate-pulse rounded-lg bg-ink/10" />
+          </div>
+        ))}
+      </section>
+    </>
+  );
 
   // Shared loading / error / empty / grid block. `adminControls` toggles the
   // per-card edit/delete/restock affordances so they only appear in the admin view.
   const renderVehicles = (adminControls: boolean) => (
     <>
-      {loading && <p className="text-sm text-ink/60">Loading…</p>}
+      {loading && renderSkeletons()}
 
       {!loading && error && (
         <p role="alert" className="rounded-lg bg-ember/10 px-4 py-3 text-sm font-medium text-ember">
@@ -224,7 +283,7 @@ function Dashboard() {
       )}
 
       {!loading && !error && vehicles.length > 0 && (
-        <section className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+        <section className={gridClass}>
           {vehicles.map((vehicle) => (
             <div key={vehicle.id} className="flex flex-col gap-2">
               <VehicleCard
@@ -252,34 +311,87 @@ function Dashboard() {
 
   return (
     <div className="flex min-h-screen bg-paper text-ink">
-      {/* Sidebar */}
-      <aside className="hidden w-60 flex-shrink-0 flex-col bg-ink px-6 py-8 text-paper md:flex">
+      {/* Desktop sidebar (≥640px). Below that it collapses into the drawer. */}
+      <aside className="hidden w-60 flex-shrink-0 flex-col bg-ink px-6 py-8 text-paper sm:flex">
         <div className="font-display text-xl font-bold leading-tight">
           Dealership<span className="text-amber">.</span>
           <div className="text-sm font-normal text-paper/60">Inventory System</div>
         </div>
-        <nav className="mt-10 flex flex-col gap-1">
-          {navItems.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              onClick={item.onClick}
-              aria-current={item.active ? 'page' : undefined}
-              className={`rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors ${
-                item.active
-                  ? 'bg-white/10 text-white'
-                  : 'text-paper/70 hover:bg-white/5 hover:text-white'
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
+        {renderNav()}
         <div className="mt-auto text-xs text-paper/40">v0.1.0 · scaffold</div>
       </aside>
 
+      {/* Mobile slide-out drawer (<640px). Only mounted while open so its nav
+          buttons never sit off-screen in the tab order. */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 sm:hidden" role="dialog" aria-modal="true">
+          <button
+            type="button"
+            aria-label="Close navigation menu"
+            onClick={() => setSidebarOpen(false)}
+            className="overlay-enter absolute inset-0 h-full w-full cursor-default bg-ink/50"
+          />
+          <aside className="drawer-enter absolute left-0 top-0 flex h-full w-64 flex-col bg-ink px-6 py-8 text-paper shadow-2xl">
+            <div className="flex items-start justify-between">
+              <div className="font-display text-xl font-bold leading-tight">
+                Dealership<span className="text-amber">.</span>
+                <div className="text-sm font-normal text-paper/60">Inventory System</div>
+              </div>
+              <button
+                type="button"
+                aria-label="Close navigation menu"
+                onClick={() => setSidebarOpen(false)}
+                className="rounded-lg p-1.5 text-paper/70 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  aria-hidden="true"
+                >
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </div>
+            {renderNav(() => setSidebarOpen(false))}
+            <div className="mt-auto text-xs text-paper/40">v0.1.0 · scaffold</div>
+          </aside>
+        </div>
+      )}
+
       {/* Main canvas */}
       <main className="flex-1 px-6 py-8 md:px-10">
+        {/* Mobile top bar with the hamburger toggle (<640px only). */}
+        <div className="mb-6 flex items-center justify-between sm:hidden">
+          <div className="font-display text-lg font-bold leading-tight text-ink">
+            Dealership<span className="text-amber">.</span>
+          </div>
+          <button
+            type="button"
+            aria-label="Open navigation menu"
+            aria-expanded={sidebarOpen}
+            onClick={() => setSidebarOpen(true)}
+            className="rounded-lg border border-ink/20 p-2 text-ink transition-colors hover:bg-ink/5"
+          >
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        </div>
+
         <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="font-display text-3xl font-bold text-ink">Inventory</h1>

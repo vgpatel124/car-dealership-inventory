@@ -77,7 +77,7 @@ export default function EditVehicleModal({ vehicle, onSave, onClose }: EditVehic
         role="dialog"
         aria-modal="true"
         aria-labelledby="edit-vehicle-title"
-        className="w-full max-w-md rounded-2xl border border-ink/10 bg-white p-6 shadow-lg"
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-ink/10 bg-white p-6 shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="edit-vehicle-title" className="font-display text-lg font-semibold text-ink">

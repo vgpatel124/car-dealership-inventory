@@ -22,6 +22,34 @@
   }
 }
 
+/* Mobile nav drawer + backdrop enter animations. Duration/animation are
+   neutralised by the reduced-motion rule below, so this stays accessible. */
+@keyframes drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.drawer-enter {
+  animation: drawer-in 160ms ease-out;
+}
+
+.overlay-enter {
+  animation: overlay-in 160ms ease-out;
+}
+
 /* Respect users who prefer reduced motion: strip non-essential animation. */
 @media (prefers-reduced-motion: reduce) {
   *,
