@@ -96,15 +96,19 @@ function Dashboard() {
     [token, loadAll],
   );
 
+  // Resolves true on success so the card can show its success toast, false on
+  // failure (the inline ember error below the card is set here as before).
   const handlePurchase = useCallback(
-    async (vehicle: Vehicle) => {
-      if (!token) return;
+    async (vehicle: Vehicle): Promise<boolean> => {
+      if (!token) return false;
       clearCardError(vehicle.id);
       try {
         const updated = await purchaseVehicle(vehicle.id, token);
         setVehicles((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
+        return true;
       } catch (err) {
         setCardError(vehicle.id, err instanceof Error ? err.message : 'Purchase failed.');
+        return false;
       }
     },
     [token],

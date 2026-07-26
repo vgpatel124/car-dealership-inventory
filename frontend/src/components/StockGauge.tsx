@@ -40,13 +40,21 @@ export default function StockGauge({
 
   const start = polar(0);
   const end = polar(1);
-  const needle = polar(fraction);
-  // Pull the needle tip slightly inside the arc.
-  const tip = {
-    x: cx + (r - 12) * Math.cos(Math.PI * (1 - fraction)),
-    y: cy - (r - 12) * Math.sin(Math.PI * (1 - fraction)),
-  };
 
+  // The filled arc is drawn as the FULL semicircle, then revealed up to the
+  // current level with stroke-dashoffset. Animating dashoffset (rather than
+  // recomputing the path `d`) lets a plain CSS transition tween the fill.
+  const arcLength = Math.PI * r;
+  const dashOffset = arcLength * (1 - fraction);
+
+  // The needle is drawn pointing at E (empty) and rotated toward the current
+  // level, so a CSS transform transition animates the sweep (0 → 180deg).
+  const rotation = fraction * 180;
+  const needleTip = { x: cx - (r - 12), y: cy };
+
+  // Transitions are intentionally CSS-based: the global prefers-reduced-motion
+  // rule in index.css zeroes their duration, so those users get an instant jump
+  // to the new value (the state still updates — only the tween is skipped).
   return (
     <div className="flex flex-col items-center">
       <svg
@@ -64,16 +72,37 @@ export default function StockGauge({
           strokeWidth={12}
           strokeLinecap="round"
         />
-        {/* Filled portion up to the current level. */}
+        {/* Filled portion — dashoffset reveals the level, stroke carries the
+            state color (moss / amber / ember). Both animate on change. */}
         <path
-          d={`M ${start.x} ${start.y} A ${r} ${r} 0 0 1 ${needle.x} ${needle.y}`}
+          d={`M ${start.x} ${start.y} A ${r} ${r} 0 0 1 ${end.x} ${end.y}`}
           fill="none"
           stroke={color}
           strokeWidth={12}
           strokeLinecap="round"
+          strokeDasharray={arcLength}
+          strokeDashoffset={dashOffset}
+          style={{ transition: 'stroke-dashoffset 600ms ease, stroke 300ms ease' }}
         />
-        {/* Needle. */}
-        <line x1={cx} y1={cy} x2={tip.x} y2={tip.y} stroke="#14183B" strokeWidth={3} strokeLinecap="round" />
+        {/* Needle — rotated about the hub so the sweep can transition. */}
+        <g
+          style={{
+            transform: `rotate(${rotation}deg)`,
+            transformBox: 'view-box',
+            transformOrigin: '100px 100px',
+            transition: 'transform 600ms ease',
+          }}
+        >
+          <line
+            x1={cx}
+            y1={cy}
+            x2={needleTip.x}
+            y2={needleTip.y}
+            stroke="#14183B"
+            strokeWidth={3}
+            strokeLinecap="round"
+          />
+        </g>
         <circle cx={cx} cy={cy} r={6} fill="#14183B" />
         {/* E / F endpoints. */}
         <text x="16" y="116" className="fill-ink/60" fontSize="12" fontFamily="'IBM Plex Mono', monospace">
@@ -84,10 +113,13 @@ export default function StockGauge({
         </text>
       </svg>
       <div className="mt-1 flex items-baseline gap-2">
-        <span className="font-mono text-lg font-semibold" style={{ color }}>
+        <span className="font-mono text-lg font-semibold" style={{ color, transition: 'color 300ms ease' }}>
           {quantity}
         </span>
-        <span className="text-xs font-medium uppercase tracking-wide" style={{ color }}>
+        <span
+          className="text-xs font-medium uppercase tracking-wide"
+          style={{ color, transition: 'color 300ms ease' }}
+        >
           {label}
         </span>
       </div>
