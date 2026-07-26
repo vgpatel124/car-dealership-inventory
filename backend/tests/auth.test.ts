@@ -59,4 +59,66 @@ describe('POST /api/auth/register', () => {
 
     expect(res.status).toBe(400);
   });
+
+  // A present-but-empty string is a distinct case from a missing key: the value
+  // exists on the body but is falsy, so validation must still reject it.
+  it('returns 400 when email is an empty string (not just missing)', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ email: '', password: 'sup3r-secret' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when password is an empty string (not just missing)', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ email: uniqueEmail(), password: '' });
+
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('POST /api/auth/login', () => {
+  const uniqueEmail = () => `login_${Date.now()}_${Math.random().toString(36).slice(2)}@example.com`;
+
+  // Registers a fresh user so login can be exercised against a KNOWN-good email
+  // (the "correct email" half of the wrong-password case below).
+  async function registerFreshUser(password = 'sup3r-secret') {
+    const email = uniqueEmail();
+    const res = await request(app).post('/api/auth/register').send({ email, password });
+    expect(res.status).toBe(201);
+    return { email, password };
+  }
+
+  it('logs in with correct credentials and returns 200 with a token', async () => {
+    const { email, password } = await registerFreshUser();
+
+    const res = await request(app).post('/api/auth/login').send({ email, password });
+
+    expect(res.status).toBe(200);
+    expect(typeof res.body.token).toBe('string');
+    expect(res.body.user).toMatchObject({ email, role: 'USER' });
+    expect(res.body.user).not.toHaveProperty('passwordHash');
+  });
+
+  it('returns 401 (NOT 404) for a correct email with the wrong password', async () => {
+    const { email } = await registerFreshUser('the-right-password');
+
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email, password: 'the-wrong-password' });
+
+    // Must be 401: a 404 here would leak that the email is registered.
+    expect(res.status).toBe(401);
+    expect(res.status).not.toBe(404);
+  });
+
+  it('returns the same 401 for an unknown email (does not leak account existence)', async () => {
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: uniqueEmail(), password: 'whatever' });
+
+    expect(res.status).toBe(401);
+  });
 });

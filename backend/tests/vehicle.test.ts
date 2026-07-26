@@ -1,4 +1,5 @@
 import request from 'supertest';
+import jwt from 'jsonwebtoken';
 import app from '../src/app';
 import prisma from '../src/utils/prisma';
 import { registerAndGetToken, registerAdminAndGetToken, bearer } from './helpers/auth';
@@ -48,6 +49,40 @@ describe('Vehicle API', () => {
 
   // A syntactically valid UUID that should never exist in the DB.
   const MISSING_ID = '00000000-0000-0000-0000-000000000000';
+
+  // GET /api/vehicles is a representative protected route: every one of these
+  // must be rejected by the `authenticate` middleware before reaching a handler.
+  describe('Authentication on protected routes (JWT handling)', () => {
+    const secret = process.env.JWT_SECRET as string;
+
+    it('returns 401 when the Authorization header is missing entirely', async () => {
+      const res = await request(app).get('/api/vehicles');
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 401 for a malformed token', async () => {
+      const res = await request(app)
+        .get('/api/vehicles')
+        .set('Authorization', 'Bearer not-a-real-jwt');
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 401 for a token signed with the wrong secret (bad signature)', async () => {
+      const forged = jwt.sign({ userId: 'ghost', role: 'USER' }, 'not-the-real-secret', {
+        expiresIn: '1d',
+      });
+      const res = await request(app).get('/api/vehicles').set('Authorization', bearer(forged));
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 401 for an expired token', async () => {
+      // Signed with the REAL secret but already past expiry, so only the expiry
+      // check can reject it — proving expiry is actually enforced.
+      const expired = jwt.sign({ userId: 'ghost', role: 'USER' }, secret, { expiresIn: -10 });
+      const res = await request(app).get('/api/vehicles').set('Authorization', bearer(expired));
+      expect(res.status).toBe(401);
+    });
+  });
 
   describe('POST /api/vehicles', () => {
     it('requires authentication (401 without a token)', async () => {
@@ -317,6 +352,14 @@ describe('Vehicle API', () => {
         .set('Authorization', bearer(token));
 
       expect(res.status).toBe(409);
+    });
+
+    it('returns 404 when purchasing a vehicle that does not exist', async () => {
+      const res = await request(app)
+        .post(`/api/vehicles/${MISSING_ID}/purchase`)
+        .set('Authorization', bearer(token));
+
+      expect(res.status).toBe(404);
     });
 
     it('handles two concurrent purchases of the last unit: exactly one 200 and one 409', async () => {
