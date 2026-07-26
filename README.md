@@ -104,6 +104,32 @@ Environment variables (see `.env.example`):
 | `JWT_EXPIRES_IN` | `1d`                 | Token lifetime                 |
 | `PORT`           | `4000`               | API port                       |
 
+#### Promoting a user to ADMIN (local testing)
+
+The public `POST /api/auth/register` endpoint only ever creates `USER`-role
+accounts — there is intentionally **no UI or API to self-promote to ADMIN**, as
+that would be a security hole. To test admin-only features (add / edit / delete /
+restock) locally, register a normal user through the app, then flip that user's
+role directly in the database:
+
+**Option A — Prisma Studio (GUI):**
+
+```bash
+cd backend
+npx prisma studio          # opens http://localhost:5555
+# Open the `User` table → find your user → set `role` to ADMIN → Save.
+```
+
+**Option B — one-line SQL (sqlite3):**
+
+```bash
+# from the backend/ directory
+sqlite3 prisma/dev.db "UPDATE User SET role='ADMIN' WHERE email='you@example.com';"
+```
+
+The role is read from the database at login time and encoded into the JWT, so
+**log out and log back in** after promoting for the new role to take effect.
+
 ### Frontend
 
 ```bash
